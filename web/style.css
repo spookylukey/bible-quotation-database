@@ -38,7 +38,7 @@ a:hover {
   color: #333;
 }
 
-.index-page .downloads {
+.index-page .downloads, .index-page .credits {
   margin: 24px 0;
 }
 
