@@ -1,7 +1,5 @@
 """Utilities for parsing and normalising Bible references."""
 
-import re
-
 from bibleverseparser import (
     ParsedReference,
 )
@@ -11,34 +9,6 @@ from bibleverseparser.parsing import (
 )
 
 _parser = bible_reference_parser_for_lang("en", strict=False)
-
-# Abbreviation map: abbreviations used in sources -> full book names.
-# Only needed for abbreviations that the non-strict parser doesn't handle correctly.
-_ABBREVIATIONS = {
-    "Deu": "Deuteronomy",
-    "Eccl": "Ecclesiastes",
-    # "Psa" -> already works, "Gen" -> already works, etc.
-}
-
-# Build regex for abbreviation replacement (case-insensitive, word boundary)
-_ABBREV_PATTERN = re.compile(
-    r"\b(" + "|".join(re.escape(k) for k in sorted(_ABBREVIATIONS, key=len, reverse=True)) + r")\b",
-    re.IGNORECASE,
-)
-
-
-def _expand_abbreviations(text: str) -> str:
-    """Expand known abbreviations to full book names."""
-    def _replace(m):
-        key = m.group(0)
-        # Try exact match first, then case-insensitive
-        if key in _ABBREVIATIONS:
-            return _ABBREVIATIONS[key]
-        for k, v in _ABBREVIATIONS.items():
-            if k.lower() == key.lower():
-                return v
-        return key
-    return _ABBREV_PATTERN.sub(_replace, text)
 
 
 def _fix_single_chapter_book(ref: ParsedReference) -> ParsedReference:
@@ -64,8 +34,7 @@ def parse_reference_from_start(text: str) -> tuple[ParsedReference, str]:
 
     Returns (parsed_ref, remaining_text).
     """
-    text = _expand_abbreviations(text.strip())
-    normalized = normalize_reference_input("en", text)
+    normalized = normalize_reference_input("en", text.strip())
     ref, remaining = _parser.parse_partial(normalized)
     # Validate that we got chapter/verse info
     if ref.start_chapter is None:
