@@ -48,6 +48,11 @@ def expand_to_single_verses(ref: ParsedReference) -> list[str]:
     return [r.canonical_form() for r in ref.to_list()]
 
 
+def to_range_string(ref: ParsedReference) -> str:
+    """Return the canonical form of a reference, preserving ranges."""
+    return ref.canonical_form()
+
+
 def normalise_reference(text: str) -> list[str]:
     """Parse a reference string and return a list of canonical single-verse references."""
     ref, remaining = parse_reference_from_start(text)
@@ -60,3 +65,17 @@ def normalise_reference_from_start(text: str) -> list[str]:
     """Parse a reference from the start of text and return canonical single-verse references."""
     ref, _ = parse_reference_from_start(text)
     return expand_to_single_verses(ref)
+
+
+def range_reference(text: str) -> str:
+    """Parse a reference string and return a single canonical range string."""
+    ref, remaining = parse_reference_from_start(text)
+    if remaining.strip():
+        raise ValueError(f"Unexpected trailing text: {remaining!r} from input {text!r}")
+    return to_range_string(ref)
+
+
+def range_reference_from_start(text: str) -> str:
+    """Parse a reference from the start of text and return a canonical range string."""
+    ref, _ = parse_reference_from_start(text)
+    return to_range_string(ref)

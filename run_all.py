@@ -11,8 +11,9 @@ steps = [
     ("Initialise DB", [sys.executable, str(ROOT / "initialise_db" / "create_db.py")]),
     ("Populate from bible-researcher.com", [sys.executable, str(ROOT / "populate_db" / "source_bible_researcher.py")]),
     ("Populate from kalvesmaki.com", [sys.executable, str(ROOT / "populate_db" / "source_kalvesmaki.py")]),
-    ("Export CSV", [sys.executable, str(ROOT / "export_csv.py")]),
-    ("Export JSON", [sys.executable, str(ROOT / "export_json.py")]),
+    ("Export CSV", [sys.executable, str(ROOT / "export_db" / "export_csv.py")]),
+    ("Export JSON", [sys.executable, str(ROOT / "export_db" / "export_json.py")]),
+    ("Export web JSON", [sys.executable, str(ROOT / "export_db" / "export_web_json.py")]),
 ]
 
 
@@ -33,11 +34,16 @@ def main():
     # Summary
     import sqlite3
     conn = sqlite3.connect(ROOT / "quotations.db")
-    total = conn.execute("SELECT COUNT(*) FROM quotation").fetchone()[0]
-    by_source = conn.execute("SELECT source, COUNT(*) FROM quotation GROUP BY source").fetchall()
+    total_single = conn.execute("SELECT COUNT(*) FROM quotation_single").fetchone()[0]
+    total_range = conn.execute("SELECT COUNT(*) FROM quotation_range").fetchone()[0]
+    by_source_single = conn.execute("SELECT source, COUNT(*) FROM quotation_single GROUP BY source").fetchall()
+    by_source_range = conn.execute("SELECT source, COUNT(*) FROM quotation_range GROUP BY source").fetchall()
     conn.close()
-    print(f"\nTotal records: {total}")
-    for source, count in by_source:
+    print(f"\nquotation_single: {total_single} total records")
+    for source, count in by_source_single:
+        print(f"  {source}: {count}")
+    print(f"\nquotation_range: {total_range} total records")
+    for source, count in by_source_range:
         print(f"  {source}: {count}")
 
 

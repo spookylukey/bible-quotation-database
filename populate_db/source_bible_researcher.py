@@ -16,8 +16,8 @@ from bs4 import BeautifulSoup
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from populate_db.ref_utils import normalise_reference
-from populate_db.db_utils import get_connection, insert_quotation
+from populate_db.ref_utils import normalise_reference, range_reference
+from populate_db.db_utils import get_connection, insert_quotation_single, insert_quotation_range
 
 SOURCE_URL = "https://www.bible-researcher.com/quote02.html"
 SOURCE_NAME = "bible-researcher.com"
@@ -29,10 +29,10 @@ def fetch_page() -> str:
     return r.text
 
 
-def parse_and_insert(html: str) -> tuple[int, int, list[str]]:
+def parse_and_insert(html: str) -> tuple[int, int, int, list[str]]:
     """Parse the HTML and insert records.
 
-    Returns (rows_processed, records_inserted, errors).
+    Returns (rows_processed, single_inserted, range_inserted, errors).
     """
     soup = BeautifulSoup(html, "lxml")
     tables = soup.find_all("table", class_="quote")
@@ -45,10 +45,12 @@ def parse_and_insert(html: str) -> tuple[int, int, list[str]]:
 
     conn = get_connection()
     # Clear previous data from this source
-    conn.execute("DELETE FROM quotation WHERE source = ?", (SOURCE_NAME,))
+    conn.execute("DELETE FROM quotation_single WHERE source = ?", (SOURCE_NAME,))
+    conn.execute("DELETE FROM quotation_range WHERE source = ?", (SOURCE_NAME,))
 
     rows_processed = 0
-    records_inserted = 0
+    single_inserted = 0
+    range_inserted = 0
     errors = []
 
     for row in rows:
@@ -68,51 +70,62 @@ def parse_and_insert(html: str) -> tuple[int, int, list[str]]:
         rows_processed += 1
 
         try:
-            ot_refs = normalise_reference(ot_text)
-            nt_refs = normalise_reference(nt_text)
+            ot_single = normalise_reference(ot_text)
+            nt_single = normalise_reference(nt_text)
+            ot_range = range_reference(ot_text)
+            nt_range = range_reference(nt_text)
         except Exception as e:
             errors.append(f"Row {rows_processed}: failed to parse '{ot_text}' / '{nt_text}': {e}")
             continue
 
-        for sr in nt_refs:
-            for qf in ot_refs:
-                insert_quotation(conn, sr, qf, SOURCE_NAME)
-                records_inserted += 1
+        # Insert single-verse (expanded) records
+        for sr in nt_single:
+            for qf in ot_single:
+                insert_quotation_single(conn, sr, qf, SOURCE_NAME)
+                single_inserted += 1
+
+        # Insert range records
+        insert_quotation_range(conn, nt_range, ot_range, SOURCE_NAME)
+        range_inserted += 1
 
     conn.commit()
     conn.close()
-    return rows_processed, records_inserted, errors
+    return rows_processed, single_inserted, range_inserted, errors
 
 
-def self_test(rows_processed: int, records_inserted: int, errors: list[str]):
+def self_test(rows_processed: int, single_inserted: int, range_inserted: int, errors: list[str]):
     """Basic sanity checks."""
     assert rows_processed > 600, f"Expected >600 rows, got {rows_processed}"
-    assert records_inserted > 600, f"Expected >600 records, got {records_inserted}"
+    assert single_inserted > 600, f"Expected >600 single records, got {single_inserted}"
+    assert range_inserted > 600, f"Expected >600 range records, got {range_inserted}"
     error_rate = len(errors) / rows_processed if rows_processed else 1
     assert error_rate < 0.05, f"Error rate too high: {error_rate:.1%} ({len(errors)}/{rows_processed})"
 
     # Verify DB contents
     conn = get_connection()
-    count = conn.execute("SELECT COUNT(*) FROM quotation WHERE source = ?", (SOURCE_NAME,)).fetchone()[0]
+    count_single = conn.execute("SELECT COUNT(*) FROM quotation_single WHERE source = ?", (SOURCE_NAME,)).fetchone()[0]
+    count_range = conn.execute("SELECT COUNT(*) FROM quotation_range WHERE source = ?", (SOURCE_NAME,)).fetchone()[0]
     conn.close()
-    assert count > 600, f"Expected >600 DB records, got {count}"
-    print(f"Self-test passed: {count} records in DB from {SOURCE_NAME}")
+    assert count_single > 600, f"Expected >600 single DB records, got {count_single}"
+    assert count_range > 600, f"Expected >600 range DB records, got {count_range}"
+    print(f"Self-test passed: {count_single} single records, {count_range} range records in DB from {SOURCE_NAME}")
 
 
 def main():
     print(f"Fetching {SOURCE_URL} ...")
     html = fetch_page()
     print(f"Parsing and inserting ...")
-    rows_processed, records_inserted, errors = parse_and_insert(html)
+    rows_processed, single_inserted, range_inserted, errors = parse_and_insert(html)
 
     print(f"Rows processed: {rows_processed}")
-    print(f"Records inserted: {records_inserted}")
+    print(f"Single records inserted: {single_inserted}")
+    print(f"Range records inserted: {range_inserted}")
     if errors:
         print(f"Errors ({len(errors)}):")
         for e in errors:
             print(f"  {e}")
 
-    self_test(rows_processed, records_inserted, errors)
+    self_test(rows_processed, single_inserted, range_inserted, errors)
 
 
 if __name__ == "__main__":

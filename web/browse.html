@@ -69,8 +69,8 @@
 
     // ——— Parse a reference string ———
     function parseRef(ref) {
-      // Match: optional "N " prefix, then book name, then chapter:verse
-      const m = ref.match(/^(.+?)\s+(\d+):(\d+)$/);
+      // Match: optional "N " prefix, then book name, then chapter:verse or chapter:verse-verse
+      const m = ref.match(/^(.+?)\s+(\d+):(\d+)(?:-(\d+))?$/);
       if (!m) return { book: ref, chapter: 0, verse: 0 };
       return { book: m[1], chapter: parseInt(m[2], 10), verse: parseInt(m[3], 10) };
     }

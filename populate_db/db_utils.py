@@ -12,30 +12,17 @@ def get_connection() -> sqlite3.Connection:
     return sqlite3.connect(DB_PATH)
 
 
-def insert_quotation(conn: sqlite3.Connection, scripture_reference: str, quoted_from: str, source: str):
-    """Insert a single quotation record, ignoring duplicates."""
+def insert_quotation_single(conn: sqlite3.Connection, scripture_reference: str, quoted_from: str, source: str):
+    """Insert a single-verse quotation record, ignoring duplicates."""
     conn.execute(
-        "INSERT OR IGNORE INTO quotation (scripture_reference, quoted_from, source) VALUES (?, ?, ?)",
+        "INSERT OR IGNORE INTO quotation_single (scripture_reference, quoted_from, source) VALUES (?, ?, ?)",
         (scripture_reference, quoted_from, source),
     )
 
 
-def insert_quotation_pairs(
-    conn: sqlite3.Connection,
-    scripture_refs: list[str],
-    quoted_from_refs: list[str],
-    source: str,
-) -> int:
-    """Insert all combinations of scripture_refs x quoted_from_refs.
-
-    Returns the number of rows inserted.
-    """
-    count = 0
-    for sr in scripture_refs:
-        for qf in quoted_from_refs:
-            conn.execute(
-                "INSERT OR IGNORE INTO quotation (scripture_reference, quoted_from, source) VALUES (?, ?, ?)",
-                (sr, qf, source),
-            )
-            count += conn.total_changes  # approximate
-    return count
+def insert_quotation_range(conn: sqlite3.Connection, scripture_reference: str, quoted_from: str, source: str):
+    """Insert a range quotation record, ignoring duplicates."""
+    conn.execute(
+        "INSERT OR IGNORE INTO quotation_range (scripture_reference, quoted_from, source) VALUES (?, ?, ?)",
+        (scripture_reference, quoted_from, source),
+    )

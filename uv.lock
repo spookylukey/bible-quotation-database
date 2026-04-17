@@ -29,7 +29,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "beautifulsoup4" },
-    { name = "bibleverseparser" },
+    { name = "bibleverseparser", specifier = ">=0.2" },
     { name = "lxml" },
     { name = "requests" },
 ]
