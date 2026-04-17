@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Browse — Bible Quotation Database</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="browse-page">
+  <div class="browse-header">
+    <h1>Bible Quotation Database</h1>
+    <a class="back-link" href="index.html">&larr; Home</a>
+  </div>
+
+  <div class="tab-bar">
+    <button class="active" data-tab="ot">OT References</button>
+    <button data-tab="nt">NT References</button>
+  </div>
+
+  <div class="filter-bar">
+    <label for="book-filter">Filter by book:</label>
+    <select id="book-filter">
+      <option value="">All books</option>
+    </select>
+    <span class="row-count" id="row-count"></span>
+  </div>
+
+  <div class="table-container">
+    <div id="status" class="status">Loading…</div>
+
+    <div id="panel-ot" class="tab-panel active">
+      <table>
+        <thead><tr><th>OT Reference</th><th>Quoted in (NT)</th></tr></thead>
+        <tbody id="tbody-ot"></tbody>
+      </table>
+    </div>
+
+    <div id="panel-nt" class="tab-panel">
+      <table>
+        <thead><tr><th>NT Reference</th><th>Quoting (OT)</th></tr></thead>
+        <tbody id="tbody-nt"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    // ——— Bible book order ———
+    const OT_BOOKS = [
+      'Genesis','Exodus','Leviticus','Numbers','Deuteronomy',
+      'Joshua','Judges','Ruth','1 Samuel','2 Samuel',
+      '1 Kings','2 Kings','1 Chronicles','2 Chronicles',
+      'Ezra','Nehemiah','Esther','Job','Psalm','Proverbs',
+      'Ecclesiastes','Song of Solomon','Isaiah','Jeremiah','Lamentations',
+      'Ezekiel','Daniel','Hosea','Joel','Amos',
+      'Obadiah','Jonah','Micah','Nahum','Habakkuk',
+      'Zephaniah','Haggai','Zechariah','Malachi'
+    ];
+    const NT_BOOKS = [
+      'Matthew','Mark','Luke','John','Acts',
+      'Romans','1 Corinthians','2 Corinthians','Galatians','Ephesians',
+      'Philippians','Colossians','1 Thessalonians','2 Thessalonians',
+      '1 Timothy','2 Timothy','Titus','Philemon','Hebrews',
+      'James','1 Peter','2 Peter','1 John','2 John','3 John',
+      'Jude','Revelation'
+    ];
+    const ALL_BOOKS = [...OT_BOOKS, ...NT_BOOKS];
+    const bookIndex = Object.create(null);
+    ALL_BOOKS.forEach((b, i) => bookIndex[b] = i);
+
+    // ——— Parse a reference string ———
+    function parseRef(ref) {
+      // Match: optional "N " prefix, then book name, then chapter:verse
+      const m = ref.match(/^(.+?)\s+(\d+):(\d+)$/);
+      if (!m) return { book: ref, chapter: 0, verse: 0 };
+      return { book: m[1], chapter: parseInt(m[2], 10), verse: parseInt(m[3], 10) };
+    }
+
+    function refSortKey(ref) {
+      const p = parseRef(ref);
+      const bi = bookIndex[p.book];
+      return (bi !== undefined ? bi : 99) * 1000000 + p.chapter * 1000 + p.verse;
+    }
+
+    function compareRefs(a, b) {
+      return refSortKey(a) - refSortKey(b);
+    }
+
+    // ——— DOM refs ———
+    const statusEl = document.getElementById('status');
+    const tbodyOT = document.getElementById('tbody-ot');
+    const tbodyNT = document.getElementById('tbody-nt');
+    const filterSelect = document.getElementById('book-filter');
+    const rowCountEl = document.getElementById('row-count');
+    const panelOT = document.getElementById('panel-ot');
+    const panelNT = document.getElementById('panel-nt');
+    const tabButtons = document.querySelectorAll('.tab-bar button');
+
+    let activeTab = 'ot';
+
+    // ——— Build tables ———
+    fetch('quotations.json')
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(data => {
+        statusEl.style.display = 'none';
+
+        // Group: OT ref → [NT refs]
+        const otMap = new Map();
+        // Group: NT ref → [OT refs]
+        const ntMap = new Map();
+
+        for (const row of data) {
+          const nt = row.nt || row.scripture_reference;
+          const ot = row.ot || row.quoted_from;
+          if (!nt || !ot) continue;
+
+          if (!otMap.has(ot)) otMap.set(ot, []);
+          if (!otMap.get(ot).includes(nt)) otMap.get(ot).push(nt);
+
+          if (!ntMap.has(nt)) ntMap.set(nt, []);
+          if (!ntMap.get(nt).includes(ot)) ntMap.get(nt).push(ot);
+        }
+
+        // Sort keys by Bible order
+        const otKeys = Array.from(otMap.keys()).sort(compareRefs);
+        const ntKeys = Array.from(ntMap.keys()).sort(compareRefs);
+
+        // Sort each group's values too
+        for (const refs of otMap.values()) refs.sort(compareRefs);
+        for (const refs of ntMap.values()) refs.sort(compareRefs);
+
+        // Build OT table rows
+        const otFrag = document.createDocumentFragment();
+        for (const otRef of otKeys) {
+          const tr = document.createElement('tr');
+          const td1 = document.createElement('td');
+          const td2 = document.createElement('td');
+          td1.textContent = otRef;
+          td2.textContent = otMap.get(otRef).join(', ');
+          tr.dataset.book = parseRef(otRef).book;
+          tr.appendChild(td1);
+          tr.appendChild(td2);
+          otFrag.appendChild(tr);
+        }
+        tbodyOT.appendChild(otFrag);
+
+        // Build NT table rows
+        const ntFrag = document.createDocumentFragment();
+        for (const ntRef of ntKeys) {
+          const tr = document.createElement('tr');
+          const td1 = document.createElement('td');
+          const td2 = document.createElement('td');
+          td1.textContent = ntRef;
+          td2.textContent = ntMap.get(ntRef).join(', ');
+          tr.dataset.book = parseRef(ntRef).book;
+          tr.appendChild(td1);
+          tr.appendChild(td2);
+          ntFrag.appendChild(tr);
+        }
+        tbodyNT.appendChild(ntFrag);
+
+        // Collect books that actually appear
+        const otBooksPresent = OT_BOOKS.filter(b => otKeys.some(k => parseRef(k).book === b));
+        const ntBooksPresent = NT_BOOKS.filter(b => ntKeys.some(k => parseRef(k).book === b));
+
+        // Store for filter rebuilds
+        window._otBooksPresent = otBooksPresent;
+        window._ntBooksPresent = ntBooksPresent;
+
+        populateFilter();
+        updateRowCount();
+      })
+      .catch(err => {
+        statusEl.textContent = 'Failed to load data: ' + err.message;
+        statusEl.classList.add('error');
+      });
+
+    // ——— Filter dropdown ———
+    function populateFilter() {
+      const books = activeTab === 'ot' ? window._otBooksPresent : window._ntBooksPresent;
+      filterSelect.innerHTML = '<option value="">All books</option>';
+      if (!books) return;
+      for (const b of books) {
+        const opt = document.createElement('option');
+        opt.value = b;
+        opt.textContent = b;
+        filterSelect.appendChild(opt);
+      }
+    }
+
+    function applyFilter() {
+      const book = filterSelect.value;
+      const tbody = activeTab === 'ot' ? tbodyOT : tbodyNT;
+      const rows = tbody.querySelectorAll('tr');
+      for (const tr of rows) {
+        tr.style.display = (!book || tr.dataset.book === book) ? '' : 'none';
+      }
+      updateRowCount();
+    }
+
+    function updateRowCount() {
+      const tbody = activeTab === 'ot' ? tbodyOT : tbodyNT;
+      const visible = tbody.querySelectorAll('tr:not([style*="display: none"])');
+      rowCountEl.textContent = visible.length + ' row' + (visible.length !== 1 ? 's' : '');
+    }
+
+    filterSelect.addEventListener('change', applyFilter);
+
+    // ——— Tab switching ———
+    for (const btn of tabButtons) {
+      btn.addEventListener('click', () => {
+        activeTab = btn.dataset.tab;
+
+        // Update button styles
+        for (const b of tabButtons) b.classList.remove('active');
+        btn.classList.add('active');
+
+        // Show/hide panels
+        panelOT.classList.toggle('active', activeTab === 'ot');
+        panelNT.classList.toggle('active', activeTab === 'nt');
+
+        // Rebuild filter for new tab and reset selection
+        filterSelect.value = '';
+        populateFilter();
+        applyFilter();
+      });
+    }
+  </script>
+</body>
+</html>
