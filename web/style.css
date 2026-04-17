@@ -233,3 +233,78 @@ tbody tr:hover {
     padding: 5px 6px;
   }
 }
+
+/* Scripture reference links */
+a.ref-link {
+  color: #1a6fb5;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+a.ref-link:hover {
+  text-decoration: underline;
+}
+
+/* Verse popovers */
+.verse-popover {
+  margin: 0;
+  padding: 0;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  max-width: 420px;
+  min-width: 240px;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  z-index: 100;
+  overflow: hidden;
+  inset: unset;
+}
+
+.popover-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #f1f3f5;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.popover-header strong {
+  flex: 1;
+}
+
+.popover-net {
+  font-size: 0.75rem;
+  color: #888;
+}
+
+.popover-close {
+  border: none;
+  background: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: #666;
+  padding: 0 2px;
+  line-height: 1;
+}
+
+.popover-close:hover {
+  color: #c92a2a;
+}
+
+.popover-body {
+  padding: 10px 12px;
+  color: #333;
+}
+
+.popover-body sup {
+  font-size: 0.7em;
+  color: #888;
+  margin-right: 1px;
+}
+
+.popover-error {
+  color: #c92a2a;
+}

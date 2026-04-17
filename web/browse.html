@@ -85,6 +85,106 @@
       return refSortKey(a) - refSortKey(b);
     }
 
+    // ——— Scripture reference links & popovers ———
+    let popoverCounter = 0;
+    const verseCache = new Map(); // ref string → Promise<html string>
+
+    function makeRefLink(ref) {
+      const a = document.createElement('a');
+      a.href = '#';
+      a.className = 'ref-link';
+      a.textContent = ref;
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        togglePopover(a, ref);
+      });
+      return a;
+    }
+
+    function makeRefLinks(refs) {
+      const frag = document.createDocumentFragment();
+      refs.forEach((ref, i) => {
+        if (i > 0) frag.appendChild(document.createTextNode(', '));
+        frag.appendChild(makeRefLink(ref));
+      });
+      return frag;
+    }
+
+    function fetchVerseText(ref) {
+      if (verseCache.has(ref)) return verseCache.get(ref);
+      const passage = encodeURIComponent(ref);
+      const url = `https://labs.bible.org/api/?passage=${passage}&type=json`;
+      const promise = fetch(url)
+        .then(r => {
+          if (!r.ok) throw new Error(r.status);
+          return r.json();
+        })
+        .then(verses => {
+          return verses.map(v => `<sup>${v.verse}</sup>${v.text}`).join('');
+        })
+        .catch(err => {
+          verseCache.delete(ref);
+          return `<em class="popover-error">Failed to load: ${err.message}</em>`;
+        });
+      verseCache.set(ref, promise);
+      return promise;
+    }
+
+    function togglePopover(anchor, ref) {
+      // If this anchor already has an open popover, close it
+      const existing = anchor._popoverEl;
+      if (existing && existing.matches(':popover-open')) {
+        existing.hidePopover();
+        existing.remove();
+        anchor._popoverEl = null;
+        return;
+      }
+
+      popoverCounter++;
+      const id = 'pop-' + popoverCounter;
+
+      const pop = document.createElement('div');
+      pop.id = id;
+      pop.className = 'verse-popover';
+      pop.setAttribute('popover', 'manual');
+      pop.innerHTML = `<div class="popover-header"><strong>${ref}</strong> <span class="popover-net">(NET)</span><button class="popover-close" aria-label="Close">&times;</button></div><div class="popover-body">Loading…</div>`;
+
+      document.body.appendChild(pop);
+      anchor._popoverEl = pop;
+
+      pop.querySelector('.popover-close').addEventListener('click', () => {
+        pop.hidePopover();
+        pop.remove();
+        anchor._popoverEl = null;
+      });
+
+      pop.showPopover();
+      positionPopover(anchor, pop);
+
+      fetchVerseText(ref).then(html => {
+        pop.querySelector('.popover-body').innerHTML = html;
+      });
+    }
+
+    function positionPopover(anchor, pop) {
+      const rect = anchor.getBoundingClientRect();
+      const scrollX = window.scrollX;
+      const scrollY = window.scrollY;
+
+      // Position below the anchor
+      pop.style.position = 'absolute';
+      pop.style.top = (rect.bottom + scrollY + 4) + 'px';
+      pop.style.left = (rect.left + scrollX) + 'px';
+
+      // After layout, ensure it doesn't overflow right edge
+      requestAnimationFrame(() => {
+        const popRect = pop.getBoundingClientRect();
+        if (popRect.right > window.innerWidth - 8) {
+          pop.style.left = Math.max(8, window.innerWidth - popRect.width - 8 + scrollX) + 'px';
+        }
+      });
+    }
+
     // ——— DOM refs ———
     const statusEl = document.getElementById('status');
     const tbodyOT = document.getElementById('tbody-ot');
@@ -134,8 +234,8 @@
           const tr = document.createElement('tr');
           const td1 = document.createElement('td');
           const td2 = document.createElement('td');
-          td1.textContent = otRef;
-          td2.textContent = otMap.get(otRef).join(', ');
+          td1.appendChild(makeRefLink(otRef));
+          td2.appendChild(makeRefLinks(otMap.get(otRef)));
           tr.dataset.book = parseRef(otRef).book;
           tr.appendChild(td1);
           tr.appendChild(td2);
@@ -149,8 +249,8 @@
           const tr = document.createElement('tr');
           const td1 = document.createElement('td');
           const td2 = document.createElement('td');
-          td1.textContent = ntRef;
-          td2.textContent = ntMap.get(ntRef).join(', ');
+          td1.appendChild(makeRefLink(ntRef));
+          td2.appendChild(makeRefLinks(ntMap.get(ntRef)));
           tr.dataset.book = parseRef(ntRef).book;
           tr.appendChild(td1);
           tr.appendChild(td2);
