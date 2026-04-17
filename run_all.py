@@ -11,6 +11,8 @@ steps = [
     ("Initialise DB", [sys.executable, str(ROOT / "initialise_db" / "create_db.py")]),
     ("Populate from bible-researcher.com", [sys.executable, str(ROOT / "populate_db" / "source_bible_researcher.py")]),
     ("Populate from kalvesmaki.com", [sys.executable, str(ROOT / "populate_db" / "source_kalvesmaki.py")]),
+    ("Export CSV", [sys.executable, str(ROOT / "export_csv.py")]),
+    ("Export JSON", [sys.executable, str(ROOT / "export_json.py")]),
 ]
 
 

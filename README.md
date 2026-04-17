@@ -5,9 +5,14 @@ Testament quoting the Old Testament.
 
 ## Download
 
-If you just want the data, download **`quotations.db`** from the
-[releases page](https://github.com/spookylukey/bible-quotation-database/releases).
-It is a SQLite database you can query directly — no build step required.
+If you just want the data, download from the
+[releases page](https://github.com/spookylukey/bible-quotation-database/releases):
+
+- **`quotations.db`** — SQLite database you can query directly
+- **`quotations.csv`** — CSV export (header row + data)
+- **`quotations.json`** — JSON array of objects
+
+No build step required.
 
 See [Schema](#schema) below for the table structure.
 
@@ -38,6 +43,8 @@ Or run individual steps:
 python initialise_db/create_db.py                # Create/recreate empty DB
 python populate_db/source_bible_researcher.py     # Source 1
 python populate_db/source_kalvesmaki.py           # Source 2
+python export_csv.py                              # Export to CSV
+python export_json.py                             # Export to JSON
 ```
 
 ## Sources
