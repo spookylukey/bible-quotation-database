@@ -5,7 +5,7 @@ import json
 import sqlite3
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent
 DB_PATH = ROOT / "quotations.db"
 JSON_PATH = ROOT / "quotations.json"
 
