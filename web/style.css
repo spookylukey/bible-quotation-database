@@ -305,6 +305,20 @@ a.ref-link:hover {
   margin-right: 1px;
 }
 
+.popover-footer {
+  padding: 6px 12px 8px;
+  border-top: 1px solid #dee2e6;
+  font-size: 0.8rem;
+}
+
+.popover-footer a {
+  color: #1a6fb5;
+}
+
+.popover-footer a:hover {
+  text-decoration: underline;
+}
+
 .popover-error {
   color: #c92a2a;
 }

@@ -147,7 +147,8 @@
       pop.id = id;
       pop.className = 'verse-popover';
       pop.setAttribute('popover', 'manual');
-      pop.innerHTML = `<div class="popover-header"><strong>${ref}</strong> <span class="popover-net">(NET)</span><button class="popover-close" aria-label="Close">&times;</button></div><div class="popover-body">Loading…</div>`;
+      const netUrl = 'https://netbible.org/bible/' + ref.replace(/\s+/g, '+').replace(/-\d+$/, '');
+      pop.innerHTML = `<div class="popover-header"><strong>${ref}</strong> <span class="popover-net">(NET)</span><button class="popover-close" aria-label="Close">&times;</button></div><div class="popover-body">Loading…</div><div class="popover-footer"><a href="${netUrl}" target="_blank" rel="noopener">Show in context →</a></div>`;
 
       document.body.appendChild(pop);
       anchor._popoverEl = pop;
