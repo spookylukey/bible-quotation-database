@@ -17,19 +17,24 @@ No build step required.
 
 See [Schema](#schema) below for the table structure.
 
----
+## Web frontend
+
+The database is available as a web page for easy browsing: [Bible quotation database](https://lukeplant.me.uk/bible-quotation-database/).
+
+
+## Source code
 
 Everything below is only needed if you want to **rebuild the database
 from source data**.
 
-## Setup
+### Setup
 
 ```bash
 uv venv
 uv pip install -e .
 ```
 
-## Rebuilding the database
+### Rebuilding the database
 
 Run everything (create DB + populate from all sources):
 
@@ -49,16 +54,16 @@ python export_db/export_json.py                   # Export to JSON
 python export_db/export_web_json.py               # Export web app JSON
 ```
 
-## Sources
+### Sources
 
 - [bible-researcher.com](https://www.bible-researcher.com/quote02.html) — ~719 quotation pairs
 - [kalvesmaki.com](https://www.kalvesmaki.com/LXX/NTChart.htm) — ~327 quotation pairs (range), ~623 (single)
 
-## Schema
+### Schema
 
 See `initialise_db/schema.sql`. The database has two tables:
 
-### `quotation_single`
+#### `quotation_single`
 
 All multi-verse ranges are expanded to individual verse references.
 
@@ -68,7 +73,7 @@ All multi-verse ranges are expanded to individual verse references.
 | `quoted_from`          | The verse being quoted (e.g. `Genesis 1:26`)                            |
 | `source`               | Which data source the record came from                                  |
 
-### `quotation_range`
+#### `quotation_range`
 
 Verse ranges are preserved as-is from the source data.
 
