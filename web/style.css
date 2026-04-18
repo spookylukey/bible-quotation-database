@@ -298,10 +298,10 @@ a.ref-link:hover {
   color: #333;
 }
 
-.popover-body sup {
+.popover-body sup, .col-text sup {
   font-size: 0.7em;
   color: #888;
-  margin-right: 1px;
+  margin-right: 0.2em;
 }
 
 .popover-footer {
@@ -381,8 +381,3 @@ body.show-texts .col-refs {
   border-bottom: 1px solid #e9ecef;
 }
 
-.ref-text-table sup {
-  font-size: 0.7em;
-  color: #888;
-  margin-right: 1px;
-}
