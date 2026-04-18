@@ -214,7 +214,7 @@ function fetchBatch(refs) {
 // ——— Populate text cells for a tab ———
 function populateTexts(tab) {
     const tbody = tab === 'ot' ? tbodyOT : tbodyNT;
-    const rows = tbody.querySelectorAll('tr');
+    const rows = tbody.querySelectorAll(':scope > tr');
 
     // Collect all unique refs
     const allRefs = new Set();
@@ -390,7 +390,7 @@ function populateFilter() {
 function applyFilter() {
     const book = filterSelect.value;
     const tbody = activeTab === 'ot' ? tbodyOT : tbodyNT;
-    const rows = tbody.querySelectorAll('tr');
+    const rows = tbody.querySelectorAll(':scope > tr');
     for (const tr of rows) {
         tr.style.display = (!book || tr.dataset.book === book) ? '' : 'none';
     }
