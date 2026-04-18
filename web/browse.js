@@ -182,7 +182,31 @@ function batchFetchVerses(refs) {
 }
 
 function fetchBatch(refs) {
-    const passage = refs.map(r => encodeURIComponent(r)).join(';');
+    // Deduplicate individual verses across all refs in the batch.
+    // The NET API merges overlapping verse requests and returns each
+    // verse only once, so we must request only unique verses and then
+    // map results back to each ref.
+
+    // Build ordered list of unique "Book Ch:V" single-verse passages
+    const seenVerses = new Set();
+    const singleVerses = []; // ordered unique single verses to request
+    const refExpansions = []; // for each input ref, list of single-verse strings
+
+    for (const ref of refs) {
+        const p = parseRef(ref);
+        const expanded = [];
+        for (let v = p.verse; v <= p.verseEnd; v++) {
+            const sv = `${p.book} ${p.chapter}:${v}`;
+            expanded.push(sv);
+            if (!seenVerses.has(sv)) {
+                seenVerses.add(sv);
+                singleVerses.push(sv);
+            }
+        }
+        refExpansions.push(expanded);
+    }
+
+    const passage = singleVerses.map(r => encodeURIComponent(r)).join(';');
     const url = `https://labs.bible.org/api/?passage=${passage}&type=json`;
     return fetch(url)
         .then(r => {
@@ -190,13 +214,20 @@ function fetchBatch(refs) {
             return r.json();
         })
         .then(allVerses => {
-            let idx = 0;
-            for (const ref of refs) {
-                const count = refVerseCount(ref);
-                const slice = allVerses.slice(idx, idx + count);
-                idx += count;
-                const html = slice.map(v => `<sup>${esc(v.verse)}</sup>${v.text}`).join('');
-                verseCache.set(ref, Promise.resolve(html));
+            // Results arrive in the same order as the deduplicated request,
+            // one entry per single verse. Build a map from single-verse
+            // string to its API result.
+            const verseTextMap = new Map();
+            for (let i = 0; i < singleVerses.length && i < allVerses.length; i++) {
+                const v = allVerses[i];
+                verseTextMap.set(singleVerses[i], `<sup>${esc(v.verse)}</sup>${v.text}`);
+            }
+
+            // Assemble HTML for each original ref from its expanded verses
+            for (let i = 0; i < refs.length; i++) {
+                const parts = refExpansions[i].map(sv => verseTextMap.get(sv) || '');
+                const html = parts.join('');
+                verseCache.set(refs[i], Promise.resolve(html || '<em class="popover-error">No text found</em>'));
             }
         })
         .catch(err => {
