@@ -205,7 +205,6 @@ tbody tr:hover {
 .row-count {
   font-size: 0.85rem;
   color: #666;
-  margin-left: auto;
 }
 
 /* Responsive */
@@ -321,4 +320,69 @@ a.ref-link:hover {
 
 .popover-error {
   color: #c92a2a;
+}
+
+/* Column visibility: text columns hidden by default, ref columns visible */
+.col-text {
+  display: none;
+}
+
+/* When body has .show-texts: text columns visible, ref columns hidden */
+body.show-texts .col-text {
+  display: table-cell;
+}
+
+body.show-texts .col-refs {
+  display: none;
+}
+
+/* Toggle texts button */
+.toggle-texts-btn {
+  margin-left: auto;
+  padding: 4px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 4px;
+  background: #fff;
+  font-size: 0.85rem;
+  font-family: inherit;
+  font-weight: 500;
+  color: #333;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.toggle-texts-btn:hover {
+  background: #e9ecef;
+  border-color: #adb5bd;
+}
+
+/* Mini ref-text table inside column 4 */
+.ref-text-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0;
+  font-size: inherit;
+}
+
+.ref-text-table td {
+  padding: 3px 6px;
+  border: none;
+  border-bottom: none;
+  vertical-align: top;
+}
+
+.ref-text-table td:first-child {
+  white-space: nowrap;
+  width: 1%;
+  padding-right: 10px;
+}
+
+.ref-text-table tr:not(:last-child) td {
+  border-bottom: 1px solid #e9ecef;
+}
+
+.ref-text-table sup {
+  font-size: 0.7em;
+  color: #888;
+  margin-right: 1px;
 }

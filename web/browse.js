@@ -23,10 +23,16 @@ ALL_BOOKS.forEach((b, i) => bookIndex[b] = i);
 
 // ——— Parse a reference string ———
 function parseRef(ref) {
-    // Match: optional "N " prefix, then book name, then chapter:verse or chapter:verse-verse
     const m = ref.match(/^(.+?)\s+(\d+):(\d+)(?:-(\d+))?$/);
-    if (!m) return { book: ref, chapter: 0, verse: 0 };
-    return { book: m[1], chapter: parseInt(m[2], 10), verse: parseInt(m[3], 10) };
+    if (!m) return { book: ref, chapter: 0, verse: 0, verseEnd: 0 };
+    const v1 = parseInt(m[3], 10);
+    const v2 = m[4] ? parseInt(m[4], 10) : v1;
+    return { book: m[1], chapter: parseInt(m[2], 10), verse: v1, verseEnd: v2 };
+}
+
+function refVerseCount(ref) {
+    const p = parseRef(ref);
+    return p.verseEnd - p.verse + 1;
 }
 
 function refSortKey(ref) {
@@ -91,7 +97,6 @@ function fetchVerseText(ref) {
 }
 
 function togglePopover(anchor, ref) {
-    // If this anchor already has an open popover, close it
     const existing = anchor._popoverEl;
     if (existing && existing.matches(':popover-open')) {
         existing.hidePopover();
@@ -132,12 +137,10 @@ function positionPopover(anchor, pop) {
     const scrollX = window.scrollX;
     const scrollY = window.scrollY;
 
-    // Position below the anchor
     pop.style.position = 'absolute';
     pop.style.top = (rect.bottom + scrollY + 4) + 'px';
     pop.style.left = (rect.left + scrollX) + 'px';
 
-    // After layout, ensure it doesn't overflow right edge
     requestAnimationFrame(() => {
         const popRect = pop.getBoundingClientRect();
         if (popRect.right > window.innerWidth - 8) {
@@ -155,8 +158,128 @@ const rowCountEl = document.getElementById('row-count');
 const panelOT = document.getElementById('panel-ot');
 const panelNT = document.getElementById('panel-nt');
 const tabButtons = document.querySelectorAll('.tab-bar button');
+const toggleTextsBtn = document.getElementById('toggle-texts');
 
 let activeTab = 'ot';
+let textsShown = false;
+let textsPopulatedOT = false;
+let textsPopulatedNT = false;
+
+// ——— Batch fetching ———
+const BATCH_SIZE = 30;
+
+function batchFetchVerses(refs) {
+    // Filter out refs already in cache
+    const uncached = refs.filter(r => !verseCache.has(r));
+    if (uncached.length === 0) return Promise.resolve();
+
+    const batches = [];
+    for (let i = 0; i < uncached.length; i += BATCH_SIZE) {
+        batches.push(uncached.slice(i, i + BATCH_SIZE));
+    }
+
+    return Promise.all(batches.map(batch => fetchBatch(batch)));
+}
+
+function fetchBatch(refs) {
+    const passage = refs.map(r => encodeURIComponent(r)).join(';');
+    const url = `https://labs.bible.org/api/?passage=${passage}&type=json`;
+    return fetch(url)
+        .then(r => {
+            if (!r.ok) throw new Error(r.status);
+            return r.json();
+        })
+        .then(allVerses => {
+            let idx = 0;
+            for (const ref of refs) {
+                const count = refVerseCount(ref);
+                const slice = allVerses.slice(idx, idx + count);
+                idx += count;
+                const html = slice.map(v => `<sup>${esc(v.verse)}</sup>${v.text}`).join('');
+                verseCache.set(ref, Promise.resolve(html));
+            }
+        })
+        .catch(err => {
+            // On error, store error for each ref so we don't retry endlessly
+            for (const ref of refs) {
+                if (!verseCache.has(ref)) {
+                    verseCache.set(ref, Promise.resolve(
+                        `<em class="popover-error">Failed to load: ${esc(err.message)}</em>`
+                    ));
+                }
+            }
+        });
+}
+
+// ——— Populate text cells for a tab ———
+function populateTexts(tab) {
+    const tbody = tab === 'ot' ? tbodyOT : tbodyNT;
+    const rows = tbody.querySelectorAll('tr');
+
+    // Collect all unique refs
+    const allRefs = new Set();
+    for (const tr of rows) {
+        const primaryRef = tr.dataset.ref;
+        if (primaryRef) allRefs.add(primaryRef);
+        const secondaryRefs = tr.dataset.secondaryRefs;
+        if (secondaryRefs) {
+            secondaryRefs.split('|').forEach(r => allRefs.add(r));
+        }
+    }
+
+    // Show loading in all text cells
+    for (const tr of rows) {
+        const cells = tr.querySelectorAll('td');
+        if (cells[1] && !cells[1].dataset.loaded) cells[1].textContent = 'Loading\u2026';
+        if (cells[3] && !cells[3].dataset.loaded) cells[3].textContent = 'Loading\u2026';
+    }
+
+    // Batch fetch then populate
+    batchFetchVerses(Array.from(allRefs)).then(() => {
+        for (const tr of rows) {
+            const cells = tr.querySelectorAll('td');
+
+            // Column 2: primary ref text
+            const primaryRef = tr.dataset.ref;
+            if (primaryRef && cells[1] && !cells[1].dataset.loaded) {
+                verseCache.get(primaryRef).then(html => {
+                    cells[1].innerHTML = html;
+                    cells[1].dataset.loaded = '1';
+                });
+            }
+
+            // Column 4: secondary refs with texts in a mini table
+            const secondaryRefs = tr.dataset.secondaryRefs;
+            if (secondaryRefs && cells[3] && !cells[3].dataset.loaded) {
+                const refList = secondaryRefs.split('|');
+                const miniTable = document.createElement('table');
+                miniTable.className = 'ref-text-table';
+                const mtBody = document.createElement('tbody');
+
+                const rowPromises = refList.map(ref => {
+                    return verseCache.get(ref).then(html => {
+                        const mtr = document.createElement('tr');
+                        const mtd1 = document.createElement('td');
+                        mtd1.appendChild(makeRefLink(ref));
+                        const mtd2 = document.createElement('td');
+                        mtd2.innerHTML = html;
+                        mtr.appendChild(mtd1);
+                        mtr.appendChild(mtd2);
+                        return mtr;
+                    });
+                });
+
+                Promise.all(rowPromises).then(mtrList => {
+                    for (const mtr of mtrList) mtBody.appendChild(mtr);
+                    miniTable.appendChild(mtBody);
+                    cells[3].textContent = '';
+                    cells[3].appendChild(miniTable);
+                    cells[3].dataset.loaded = '1';
+                });
+            }
+        }
+    });
+}
 
 // ——— Build tables ———
 fetch('./quotations.json')
@@ -164,9 +287,7 @@ fetch('./quotations.json')
     .then(data => {
         statusEl.style.display = 'none';
 
-        // Group: OT ref → [NT refs]
         const otMap = new Map();
-        // Group: NT ref → [OT refs]
         const ntMap = new Map();
 
         for (const row of data) {
@@ -181,49 +302,67 @@ fetch('./quotations.json')
             if (!ntMap.get(nt).includes(ot)) ntMap.get(nt).push(ot);
         }
 
-        // Sort keys by Bible order
         const otKeys = Array.from(otMap.keys()).sort(compareRefs);
         const ntKeys = Array.from(ntMap.keys()).sort(compareRefs);
 
-        // Sort each group's values too
         for (const refs of otMap.values()) refs.sort(compareRefs);
         for (const refs of ntMap.values()) refs.sort(compareRefs);
 
-        // Build OT table rows
         const otFrag = document.createDocumentFragment();
         for (const otRef of otKeys) {
             const tr = document.createElement('tr');
             const td1 = document.createElement('td');
             const td2 = document.createElement('td');
+            const td3 = document.createElement('td');
+            const td4 = document.createElement('td');
+
             td1.appendChild(makeRefLink(otRef));
-            td2.appendChild(makeRefLinks(otMap.get(otRef)));
+            td2.className = 'col-text';
+            td3.className = 'col-refs';
+            td3.appendChild(makeRefLinks(otMap.get(otRef)));
+            td4.className = 'col-text';
+
             tr.dataset.book = parseRef(otRef).book;
+            tr.dataset.ref = otRef;
+            tr.dataset.secondaryRefs = otMap.get(otRef).join('|');
+
             tr.appendChild(td1);
             tr.appendChild(td2);
+            tr.appendChild(td3);
+            tr.appendChild(td4);
             otFrag.appendChild(tr);
         }
         tbodyOT.appendChild(otFrag);
 
-        // Build NT table rows
         const ntFrag = document.createDocumentFragment();
         for (const ntRef of ntKeys) {
             const tr = document.createElement('tr');
             const td1 = document.createElement('td');
             const td2 = document.createElement('td');
+            const td3 = document.createElement('td');
+            const td4 = document.createElement('td');
+
             td1.appendChild(makeRefLink(ntRef));
-            td2.appendChild(makeRefLinks(ntMap.get(ntRef)));
+            td2.className = 'col-text';
+            td3.className = 'col-refs';
+            td3.appendChild(makeRefLinks(ntMap.get(ntRef)));
+            td4.className = 'col-text';
+
             tr.dataset.book = parseRef(ntRef).book;
+            tr.dataset.ref = ntRef;
+            tr.dataset.secondaryRefs = ntMap.get(ntRef).join('|');
+
             tr.appendChild(td1);
             tr.appendChild(td2);
+            tr.appendChild(td3);
+            tr.appendChild(td4);
             ntFrag.appendChild(tr);
         }
         tbodyNT.appendChild(ntFrag);
 
-        // Collect books that actually appear
         const otBooksPresent = OT_BOOKS.filter(b => otKeys.some(k => parseRef(k).book === b));
         const ntBooksPresent = NT_BOOKS.filter(b => ntKeys.some(k => parseRef(k).book === b));
 
-        // Store for filter rebuilds
         window._otBooksPresent = otBooksPresent;
         window._ntBooksPresent = ntBooksPresent;
 
@@ -271,17 +410,43 @@ for (const btn of tabButtons) {
     btn.addEventListener('click', () => {
         activeTab = btn.dataset.tab;
 
-        // Update button styles
         for (const b of tabButtons) b.classList.remove('active');
         btn.classList.add('active');
 
-        // Show/hide panels
         panelOT.classList.toggle('active', activeTab === 'ot');
         panelNT.classList.toggle('active', activeTab === 'nt');
 
-        // Rebuild filter for new tab and reset selection
         filterSelect.value = '';
         populateFilter();
         applyFilter();
+
+        // If texts are shown and this tab hasn't been populated yet, populate
+        if (textsShown) {
+            if (activeTab === 'ot' && !textsPopulatedOT) {
+                textsPopulatedOT = true;
+                populateTexts('ot');
+            } else if (activeTab === 'nt' && !textsPopulatedNT) {
+                textsPopulatedNT = true;
+                populateTexts('nt');
+            }
+        }
     });
 }
+
+// ——— Toggle texts ———
+toggleTextsBtn.addEventListener('click', () => {
+    textsShown = !textsShown;
+    document.body.classList.toggle('show-texts', textsShown);
+    toggleTextsBtn.textContent = textsShown ? 'Hide all texts' : 'Show all texts';
+
+    if (textsShown) {
+        // Populate current tab if needed
+        if (activeTab === 'ot' && !textsPopulatedOT) {
+            textsPopulatedOT = true;
+            populateTexts('ot');
+        } else if (activeTab === 'nt' && !textsPopulatedNT) {
+            textsPopulatedNT = true;
+            populateTexts('nt');
+        }
+    }
+});

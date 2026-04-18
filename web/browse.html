@@ -23,6 +23,7 @@
         <option value="">All books</option>
       </select>
       <span class="row-count" id="row-count"></span>
+      <button id="toggle-texts" class="toggle-texts-btn">Show all texts</button>
     </div>
 
     <div class="table-container">
@@ -30,14 +31,24 @@
 
       <div id="panel-ot" class="tab-panel active">
         <table>
-          <thead><tr><th>OT Reference</th><th>Quoted in (NT)</th></tr></thead>
+          <thead><tr>
+            <th>OT Reference</th>
+            <th class="col-text">Text</th>
+            <th class="col-refs">Quoted in (NT)</th>
+            <th class="col-text">Quoted in (NT)</th>
+          </tr></thead>
           <tbody id="tbody-ot"></tbody>
         </table>
       </div>
 
       <div id="panel-nt" class="tab-panel">
         <table>
-          <thead><tr><th>NT Reference</th><th>Quoting (OT)</th></tr></thead>
+          <thead><tr>
+            <th>NT Reference</th>
+            <th class="col-text">Text</th>
+            <th class="col-refs">Quoting (OT)</th>
+            <th class="col-text">Quoting (OT)</th>
+          </tr></thead>
           <tbody id="tbody-nt"></tbody>
         </table>
       </div>
