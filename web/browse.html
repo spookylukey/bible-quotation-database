@@ -1,330 +1,47 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Browse — Bible Quotation Database</title>
-  <link rel="stylesheet" href="style.css">
-</head>
-<body class="browse-page">
-  <div class="browse-header">
-    <h1>Bible Quotation Database</h1>
-    <a class="back-link" href="index.html">&larr; Home</a>
-  </div>
-
-  <div class="tab-bar">
-    <button class="active" data-tab="ot">OT References</button>
-    <button data-tab="nt">NT References</button>
-  </div>
-
-  <div class="filter-bar">
-    <label for="book-filter">Filter by book:</label>
-    <select id="book-filter">
-      <option value="">All books</option>
-    </select>
-    <span class="row-count" id="row-count"></span>
-  </div>
-
-  <div class="table-container">
-    <div id="status" class="status">Loading…</div>
-
-    <div id="panel-ot" class="tab-panel active">
-      <table>
-        <thead><tr><th>OT Reference</th><th>Quoted in (NT)</th></tr></thead>
-        <tbody id="tbody-ot"></tbody>
-      </table>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Browse — Bible Quotation Database</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body class="browse-page">
+    <div class="browse-header">
+      <h1>Bible Quotation Database</h1>
+      <a class="back-link" href="index.html">&larr; Home</a>
     </div>
 
-    <div id="panel-nt" class="tab-panel">
-      <table>
-        <thead><tr><th>NT Reference</th><th>Quoting (OT)</th></tr></thead>
-        <tbody id="tbody-nt"></tbody>
-      </table>
+    <div class="tab-bar">
+      <button class="active" data-tab="ot">OT References</button>
+      <button data-tab="nt">NT References</button>
     </div>
-  </div>
 
-  <script>
-    // ——— Bible book order ———
-    const OT_BOOKS = [
-      'Genesis','Exodus','Leviticus','Numbers','Deuteronomy',
-      'Joshua','Judges','Ruth','1 Samuel','2 Samuel',
-      '1 Kings','2 Kings','1 Chronicles','2 Chronicles',
-      'Ezra','Nehemiah','Esther','Job','Psalm','Proverbs',
-      'Ecclesiastes','Song of Solomon','Isaiah','Jeremiah','Lamentations',
-      'Ezekiel','Daniel','Hosea','Joel','Amos',
-      'Obadiah','Jonah','Micah','Nahum','Habakkuk',
-      'Zephaniah','Haggai','Zechariah','Malachi'
-    ];
-    const NT_BOOKS = [
-      'Matthew','Mark','Luke','John','Acts',
-      'Romans','1 Corinthians','2 Corinthians','Galatians','Ephesians',
-      'Philippians','Colossians','1 Thessalonians','2 Thessalonians',
-      '1 Timothy','2 Timothy','Titus','Philemon','Hebrews',
-      'James','1 Peter','2 Peter','1 John','2 John','3 John',
-      'Jude','Revelation'
-    ];
-    const ALL_BOOKS = [...OT_BOOKS, ...NT_BOOKS];
-    const bookIndex = Object.create(null);
-    ALL_BOOKS.forEach((b, i) => bookIndex[b] = i);
+    <div class="filter-bar">
+      <label for="book-filter">Filter by book:</label>
+      <select id="book-filter">
+        <option value="">All books</option>
+      </select>
+      <span class="row-count" id="row-count"></span>
+    </div>
 
-    // ——— Parse a reference string ———
-    function parseRef(ref) {
-      // Match: optional "N " prefix, then book name, then chapter:verse or chapter:verse-verse
-      const m = ref.match(/^(.+?)\s+(\d+):(\d+)(?:-(\d+))?$/);
-      if (!m) return { book: ref, chapter: 0, verse: 0 };
-      return { book: m[1], chapter: parseInt(m[2], 10), verse: parseInt(m[3], 10) };
-    }
+    <div class="table-container">
+      <div id="status" class="status">Loading…</div>
 
-    function refSortKey(ref) {
-      const p = parseRef(ref);
-      const bi = bookIndex[p.book];
-      return (bi !== undefined ? bi : 99) * 1000000 + p.chapter * 1000 + p.verse;
-    }
+      <div id="panel-ot" class="tab-panel active">
+        <table>
+          <thead><tr><th>OT Reference</th><th>Quoted in (NT)</th></tr></thead>
+          <tbody id="tbody-ot"></tbody>
+        </table>
+      </div>
 
-    function compareRefs(a, b) {
-      return refSortKey(a) - refSortKey(b);
-    }
-
-    // ——— Scripture reference links & popovers ———
-    let popoverCounter = 0;
-    const verseCache = new Map(); // ref string → Promise<html string>
-
-    function makeRefLink(ref) {
-      const a = document.createElement('a');
-      a.href = '#';
-      a.className = 'ref-link';
-      a.textContent = ref;
-      a.addEventListener('click', (e) => {
-        e.preventDefault();
-        togglePopover(a, ref);
-      });
-      return a;
-    }
-
-    function makeRefLinks(refs) {
-      const frag = document.createDocumentFragment();
-      refs.forEach((ref, i) => {
-        if (i > 0) frag.appendChild(document.createTextNode(', '));
-        frag.appendChild(makeRefLink(ref));
-      });
-      return frag;
-    }
-
-    function fetchVerseText(ref) {
-      if (verseCache.has(ref)) return verseCache.get(ref);
-      const passage = encodeURIComponent(ref);
-      const url = `https://labs.bible.org/api/?passage=${passage}&type=json`;
-      const promise = fetch(url)
-        .then(r => {
-          if (!r.ok) throw new Error(r.status);
-          return r.json();
-        })
-        .then(verses => {
-          return verses.map(v => `<sup>${v.verse}</sup>${v.text}`).join('');
-        })
-        .catch(err => {
-          verseCache.delete(ref);
-          return `<em class="popover-error">Failed to load: ${err.message}</em>`;
-        });
-      verseCache.set(ref, promise);
-      return promise;
-    }
-
-    function togglePopover(anchor, ref) {
-      // If this anchor already has an open popover, close it
-      const existing = anchor._popoverEl;
-      if (existing && existing.matches(':popover-open')) {
-        existing.hidePopover();
-        existing.remove();
-        anchor._popoverEl = null;
-        return;
-      }
-
-      popoverCounter++;
-      const id = 'pop-' + popoverCounter;
-
-      const pop = document.createElement('div');
-      pop.id = id;
-      pop.className = 'verse-popover';
-      pop.setAttribute('popover', 'manual');
-      const netUrl = 'https://netbible.org/bible/' + ref.replace(/\s+/g, '+').replace(/-\d+$/, '');
-      pop.innerHTML = `<div class="popover-header"><strong>${ref}</strong> <span class="popover-net">(NET)</span><button class="popover-close" aria-label="Close">&times;</button></div><div class="popover-body">Loading…</div><div class="popover-footer"><a href="${netUrl}" target="_blank" rel="noopener">Show in context →</a></div>`;
-
-      document.body.appendChild(pop);
-      anchor._popoverEl = pop;
-
-      pop.querySelector('.popover-close').addEventListener('click', () => {
-        pop.hidePopover();
-        pop.remove();
-        anchor._popoverEl = null;
-      });
-
-      pop.showPopover();
-      positionPopover(anchor, pop);
-
-      fetchVerseText(ref).then(html => {
-        pop.querySelector('.popover-body').innerHTML = html;
-      });
-    }
-
-    function positionPopover(anchor, pop) {
-      const rect = anchor.getBoundingClientRect();
-      const scrollX = window.scrollX;
-      const scrollY = window.scrollY;
-
-      // Position below the anchor
-      pop.style.position = 'absolute';
-      pop.style.top = (rect.bottom + scrollY + 4) + 'px';
-      pop.style.left = (rect.left + scrollX) + 'px';
-
-      // After layout, ensure it doesn't overflow right edge
-      requestAnimationFrame(() => {
-        const popRect = pop.getBoundingClientRect();
-        if (popRect.right > window.innerWidth - 8) {
-          pop.style.left = Math.max(8, window.innerWidth - popRect.width - 8 + scrollX) + 'px';
-        }
-      });
-    }
-
-    // ——— DOM refs ———
-    const statusEl = document.getElementById('status');
-    const tbodyOT = document.getElementById('tbody-ot');
-    const tbodyNT = document.getElementById('tbody-nt');
-    const filterSelect = document.getElementById('book-filter');
-    const rowCountEl = document.getElementById('row-count');
-    const panelOT = document.getElementById('panel-ot');
-    const panelNT = document.getElementById('panel-nt');
-    const tabButtons = document.querySelectorAll('.tab-bar button');
-
-    let activeTab = 'ot';
-
-    // ——— Build tables ———
-    fetch('quotations.json')
-      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then(data => {
-        statusEl.style.display = 'none';
-
-        // Group: OT ref → [NT refs]
-        const otMap = new Map();
-        // Group: NT ref → [OT refs]
-        const ntMap = new Map();
-
-        for (const row of data) {
-          const nt = row.nt || row.scripture_reference;
-          const ot = row.ot || row.quoted_from;
-          if (!nt || !ot) continue;
-
-          if (!otMap.has(ot)) otMap.set(ot, []);
-          if (!otMap.get(ot).includes(nt)) otMap.get(ot).push(nt);
-
-          if (!ntMap.has(nt)) ntMap.set(nt, []);
-          if (!ntMap.get(nt).includes(ot)) ntMap.get(nt).push(ot);
-        }
-
-        // Sort keys by Bible order
-        const otKeys = Array.from(otMap.keys()).sort(compareRefs);
-        const ntKeys = Array.from(ntMap.keys()).sort(compareRefs);
-
-        // Sort each group's values too
-        for (const refs of otMap.values()) refs.sort(compareRefs);
-        for (const refs of ntMap.values()) refs.sort(compareRefs);
-
-        // Build OT table rows
-        const otFrag = document.createDocumentFragment();
-        for (const otRef of otKeys) {
-          const tr = document.createElement('tr');
-          const td1 = document.createElement('td');
-          const td2 = document.createElement('td');
-          td1.appendChild(makeRefLink(otRef));
-          td2.appendChild(makeRefLinks(otMap.get(otRef)));
-          tr.dataset.book = parseRef(otRef).book;
-          tr.appendChild(td1);
-          tr.appendChild(td2);
-          otFrag.appendChild(tr);
-        }
-        tbodyOT.appendChild(otFrag);
-
-        // Build NT table rows
-        const ntFrag = document.createDocumentFragment();
-        for (const ntRef of ntKeys) {
-          const tr = document.createElement('tr');
-          const td1 = document.createElement('td');
-          const td2 = document.createElement('td');
-          td1.appendChild(makeRefLink(ntRef));
-          td2.appendChild(makeRefLinks(ntMap.get(ntRef)));
-          tr.dataset.book = parseRef(ntRef).book;
-          tr.appendChild(td1);
-          tr.appendChild(td2);
-          ntFrag.appendChild(tr);
-        }
-        tbodyNT.appendChild(ntFrag);
-
-        // Collect books that actually appear
-        const otBooksPresent = OT_BOOKS.filter(b => otKeys.some(k => parseRef(k).book === b));
-        const ntBooksPresent = NT_BOOKS.filter(b => ntKeys.some(k => parseRef(k).book === b));
-
-        // Store for filter rebuilds
-        window._otBooksPresent = otBooksPresent;
-        window._ntBooksPresent = ntBooksPresent;
-
-        populateFilter();
-        updateRowCount();
-      })
-      .catch(err => {
-        statusEl.textContent = 'Failed to load data: ' + err.message;
-        statusEl.classList.add('error');
-      });
-
-    // ——— Filter dropdown ———
-    function populateFilter() {
-      const books = activeTab === 'ot' ? window._otBooksPresent : window._ntBooksPresent;
-      filterSelect.innerHTML = '<option value="">All books</option>';
-      if (!books) return;
-      for (const b of books) {
-        const opt = document.createElement('option');
-        opt.value = b;
-        opt.textContent = b;
-        filterSelect.appendChild(opt);
-      }
-    }
-
-    function applyFilter() {
-      const book = filterSelect.value;
-      const tbody = activeTab === 'ot' ? tbodyOT : tbodyNT;
-      const rows = tbody.querySelectorAll('tr');
-      for (const tr of rows) {
-        tr.style.display = (!book || tr.dataset.book === book) ? '' : 'none';
-      }
-      updateRowCount();
-    }
-
-    function updateRowCount() {
-      const tbody = activeTab === 'ot' ? tbodyOT : tbodyNT;
-      const visible = tbody.querySelectorAll('tr:not([style*="display: none"])');
-      rowCountEl.textContent = visible.length + ' row' + (visible.length !== 1 ? 's' : '');
-    }
-
-    filterSelect.addEventListener('change', applyFilter);
-
-    // ——— Tab switching ———
-    for (const btn of tabButtons) {
-      btn.addEventListener('click', () => {
-        activeTab = btn.dataset.tab;
-
-        // Update button styles
-        for (const b of tabButtons) b.classList.remove('active');
-        btn.classList.add('active');
-
-        // Show/hide panels
-        panelOT.classList.toggle('active', activeTab === 'ot');
-        panelNT.classList.toggle('active', activeTab === 'nt');
-
-        // Rebuild filter for new tab and reset selection
-        filterSelect.value = '';
-        populateFilter();
-        applyFilter();
-      });
-    }
-  </script>
-</body>
+      <div id="panel-nt" class="tab-panel">
+        <table>
+          <thead><tr><th>NT Reference</th><th>Quoting (OT)</th></tr></thead>
+          <tbody id="tbody-nt"></tbody>
+        </table>
+      </div>
+    </div>
+    <script src="./browse.js"></script>
+  </body>
 </html>
