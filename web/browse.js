@@ -214,13 +214,13 @@ function fetchBatch(refs) {
             return r.json();
         })
         .then(allVerses => {
-            // Results arrive in the same order as the deduplicated request,
-            // one entry per single verse. Build a map from single-verse
-            // string to its API result.
+            // Results arrive one entry per single verse, not always in the same
+            // order as the request.
             const verseTextMap = new Map();
-            for (let i = 0; i < singleVerses.length && i < allVerses.length; i++) {
+            for (let i = 0; i < allVerses.length; i++) {
                 const v = allVerses[i];
-                verseTextMap.set(singleVerses[i], `<sup>${esc(v.verse)}</sup>${v.text}`);
+                const vRef = v.bookname + " " + v.chapter + ":" + v.verse;
+                verseTextMap.set(vRef, `<sup>${esc(v.verse)}</sup>${v.text}`);
             }
 
             // Assemble HTML for each original ref from its expanded verses
