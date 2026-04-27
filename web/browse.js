@@ -219,7 +219,8 @@ function fetchBatch(refs) {
             const verseTextMap = new Map();
             for (let i = 0; i < allVerses.length; i++) {
                 const v = allVerses[i];
-                const vRef = v.bookname + " " + v.chapter + ":" + v.verse;
+                const bookname = v.bookname.replace('Psalms', 'Psalm');
+                const vRef = bookname + ' ' + v.chapter + ':' + v.verse;
                 verseTextMap.set(vRef, `<sup>${esc(v.verse)}</sup>${v.text}`);
             }
 
